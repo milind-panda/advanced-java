@@ -1,0 +1,182 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class BankManagementSystem {
+    static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
+    static final String DB_URL = "jdbc:mysql://localhost:3306/bank_db";
+    static final String USER = "root";
+    static final String PASS = "password";
+
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        try {
+            Class.forName(JDBC_DRIVER);
+            Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+            System.out.println("Connected to Bank Database!\n");
+
+            boolean exit = false;
+            while (!exit) {
+                System.out.println("=== Bank Management Menu ===");
+                System.out.println("1. Create Account");
+                System.out.println("2. View All Accounts");
+                System.out.println("3. Update Account");
+                System.out.println("4. Delete Account");
+                System.out.println("5. Deposit Money");
+                System.out.println("6. Withdraw Money");
+                System.out.println("7. Transfer Money");
+                System.out.println("8. Exit");
+                System.out.print("Choose an option: ");
+                int choice = sc.nextInt();
+                sc.nextLine(); // consume newline
+
+                switch (choice) {
+                    case 1: // CREATE
+                        System.out.print("Enter name: ");
+                        String name = sc.nextLine();
+                        System.out.print("Enter email: ");
+                        String email = sc.nextLine();
+                        System.out.print("Enter initial balance: ");
+                        double balance = sc.nextDouble();
+                        String insertSQL = "INSERT INTO accounts (name, email, balance) VALUES (?, ?, ?)";
+                        PreparedStatement insertStmt = conn.prepareStatement(insertSQL);
+                        insertStmt.setString(1, name);
+                        insertStmt.setString(2, email);
+                        insertStmt.setDouble(3, balance);
+                        int inserted = insertStmt.executeUpdate();
+                        System.out.println(inserted + " account created.\n");
+                        break;
+
+                    case 2: // READ
+                        String selectSQL = "SELECT * FROM accounts";
+                        PreparedStatement selectStmt = conn.prepareStatement(selectSQL);
+                        ResultSet rs = selectStmt.executeQuery();
+                        System.out.println("\nAccount_ID | Name | Email | Balance");
+                        while (rs.next()) {
+                            System.out.println(rs.getInt("account_id") + " | " +
+                                               rs.getString("name") + " | " +
+                                               rs.getString("email") + " | " +
+                                               rs.getDouble("balance"));
+                        }
+                        System.out.println();
+                        break;
+
+                    case 3: // UPDATE
+                        System.out.print("Enter account id to update: ");
+                        int updateId = sc.nextInt();
+                        sc.nextLine();
+                        System.out.print("Enter new name: ");
+                        String newName = sc.nextLine();
+                        System.out.print("Enter new email: ");
+                        String newEmail = sc.nextLine();
+                        String updateSQL = "UPDATE accounts SET name = ?, email = ? WHERE account_id = ?";
+                        PreparedStatement updateStmt = conn.prepareStatement(updateSQL);
+                        updateStmt.setString(1, newName);
+                        updateStmt.setString(2, newEmail);
+                        updateStmt.setInt(3, updateId);
+                        int updated = updateStmt.executeUpdate();
+                        System.out.println(updated + " account(s) updated.\n");
+                        break;
+
+                    case 4: // DELETE
+                        System.out.print("Enter account id to delete: ");
+                        int deleteId = sc.nextInt();
+                        String deleteSQL = "DELETE FROM accounts WHERE account_id = ?";
+                        PreparedStatement deleteStmt = conn.prepareStatement(deleteSQL);
+                        deleteStmt.setInt(1, deleteId);
+                        int deleted = deleteStmt.executeUpdate();
+                        System.out.println(deleted + " account(s) deleted.\n");
+                        break;
+
+                    case 5: // DEPOSIT
+                        System.out.print("Enter account id: ");
+                        int depositId = sc.nextInt();
+                        System.out.print("Enter amount to deposit: ");
+                        double depositAmt = sc.nextDouble();
+                        String depositSQL = "UPDATE accounts SET balance = balance + ? WHERE account_id = ?";
+                        PreparedStatement depositStmt = conn.prepareStatement(depositSQL);
+                        depositStmt.setDouble(1, depositAmt);
+                        depositStmt.setInt(2, depositId);
+                        int dep = depositStmt.executeUpdate();
+                        System.out.println(dep + " account updated with deposit.\n");
+                        break;
+
+                    case 6: // WITHDRAW
+                        System.out.print("Enter account id: ");
+                        int withdrawId = sc.nextInt();
+                        System.out.print("Enter amount to withdraw: ");
+                        double withdrawAmt = sc.nextDouble();
+                        // check balance first
+                        String checkSQL = "SELECT balance FROM accounts WHERE account_id = ?";
+                        PreparedStatement checkStmt = conn.prepareStatement(checkSQL);
+                        checkStmt.setInt(1, withdrawId);
+                        ResultSet balanceRS = checkStmt.executeQuery();
+                        if (balanceRS.next()) {
+                            double currBalance = balanceRS.getDouble("balance");
+                            if (currBalance >= withdrawAmt) {
+                                String withdrawSQL = "UPDATE accounts SET balance = balance - ? WHERE account_id = ?";
+                                PreparedStatement withdrawStmt = conn.prepareStatement(withdrawSQL);
+                                withdrawStmt.setDouble(1, withdrawAmt);
+                                withdrawStmt.setInt(2, withdrawId);
+                                withdrawStmt.executeUpdate();
+                                System.out.println("Withdrawal successful.\n");
+                            } else {
+                                System.out.println("Insufficient balance.\n");
+                            }
+                        }
+                        break;
+
+                    case 7: // TRANSFER
+                        System.out.print("Enter source account id: ");
+                        int srcId = sc.nextInt();
+                        System.out.print("Enter destination account id: ");
+                        int destId = sc.nextInt();
+                        System.out.print("Enter amount to transfer: ");
+                        double transferAmt = sc.nextDouble();
+
+                        // check source balance
+                        String srcCheckSQL = "SELECT balance FROM accounts WHERE account_id = ?";
+                        PreparedStatement srcCheckStmt = conn.prepareStatement(srcCheckSQL);
+                        srcCheckStmt.setInt(1, srcId);
+                        ResultSet srcRS = srcCheckStmt.executeQuery();
+                        if (srcRS.next()) {
+                            double srcBalance = srcRS.getDouble("balance");
+                            if (srcBalance >= transferAmt) {
+                                // Withdraw from source
+                                String withdrawSQL2 = "UPDATE accounts SET balance = balance - ? WHERE account_id = ?";
+                                PreparedStatement withdrawStmt2 = conn.prepareStatement(withdrawSQL2);
+                                withdrawStmt2.setDouble(1, transferAmt);
+                                withdrawStmt2.setInt(2, srcId);
+                                withdrawStmt2.executeUpdate();
+
+                                // Deposit to destination
+                                String depositSQL2 = "UPDATE accounts SET balance = balance + ? WHERE account_id = ?";
+                                PreparedStatement depositStmt2 = conn.prepareStatement(depositSQL2);
+                                depositStmt2.setDouble(1, transferAmt);
+                                depositStmt2.setInt(2, destId);
+                                depositStmt2.executeUpdate();
+
+                                System.out.println("Transfer successful!\n");
+                            } else {
+                                System.out.println("Insufficient balance in source account.\n");
+                            }
+                        }
+                        break;
+
+                    case 8:
+                        exit = true;
+                        System.out.println("Exiting...");
+                        break;
+
+                    default:
+                        System.out.println("Invalid option. Try again.\n");
+                        break;
+                }
+            }
+
+            conn.close();
+            sc.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
