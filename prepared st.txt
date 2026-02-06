@@ -1,0 +1,72 @@
+import java.sql.*;
+import java.util.Scanner;
+
+public class JDBC_PreparedCRUD {
+    static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
+    static final String DB_URL = "jdbc:mysql://localhost:3306/your_database";
+    static final String USER = "root";
+    static final String PASS = "password";
+
+    public static void main(String[] args) {
+        Connection conn = null;
+        Scanner sc = new Scanner(System.in);
+
+        try {
+            // 1️⃣ Load driver and connect
+            Class.forName(JDBC_DRIVER);
+            conn = DriverManager.getConnection(DB_URL, USER, PASS);
+            System.out.println("Connected to database successfully!\n");
+
+            // ------------------ CREATE ------------------
+            System.out.println("Inserting a new student...");
+            String insertSQL = "INSERT INTO students (name, age, email) VALUES (?, ?, ?)";
+            PreparedStatement insertStmt = conn.prepareStatement(insertSQL);
+            insertStmt.setString(1, "Milind");
+            insertStmt.setInt(2, 22);
+            insertStmt.setString(3, "milind@example.com");
+            int rowsInserted = insertStmt.executeUpdate();
+            System.out.println(rowsInserted + " row(s) inserted.\n");
+
+            // ------------------ READ ------------------
+            System.out.println("Reading all students...");
+            String selectSQL = "SELECT * FROM students";
+            PreparedStatement selectStmt = conn.prepareStatement(selectSQL);
+            ResultSet rs = selectStmt.executeQuery();
+            while (rs.next()) {
+                System.out.println(rs.getInt("id") + " | " +
+                                   rs.getString("name") + " | " +
+                                   rs.getInt("age") + " | " +
+                                   rs.getString("email"));
+            }
+            System.out.println();
+
+            // ------------------ UPDATE ------------------
+            System.out.println("Updating student email...");
+            String updateSQL = "UPDATE students SET email = ? WHERE name = ?";
+            PreparedStatement updateStmt = conn.prepareStatement(updateSQL);
+            updateStmt.setString(1, "milind.panda@example.com");
+            updateStmt.setString(2, "Milind");
+            int rowsUpdated = updateStmt.executeUpdate();
+            System.out.println(rowsUpdated + " row(s) updated.\n");
+
+            // ------------------ DELETE ------------------
+            System.out.println("Deleting student...");
+            String deleteSQL = "DELETE FROM students WHERE name = ?";
+            PreparedStatement deleteStmt = conn.prepareStatement(deleteSQL);
+            deleteStmt.setString(1, "Milind");
+            int rowsDeleted = deleteStmt.executeUpdate();
+            System.out.println(rowsDeleted + " row(s) deleted.\n");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (conn != null) conn.close();
+                System.out.println("Connection closed.");
+            } catch (SQLException se) {
+                se.printStackTrace();
+            }
+            sc.close();
+        }
+    }
+}
